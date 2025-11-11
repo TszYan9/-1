@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>運動體適能配對挑戰</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3b82f6; /* Blue-500 */
+            --secondary-color: #10b981; /* Emerald-500 */
+            --bg-dark: #1f2937; /* Gray-800 */
+            --bg-light: #f3f4f6; /* Gray-100 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .game-card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .role-item {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+            background-color: #f0f9ff; /* Blue-50 */
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        .role-item:active {
+            cursor: grabbing;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+        }
+
+        .fitness-slot {
+            background-color: var(--bg-light);
+            border: 2px dashed #9ca3af; /* Gray-400 */
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .fitness-slot.drag-over {
+            background-color: #d1fae5; /* Emerald-100 */
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .match-correct {
+            background-color: var(--secondary-color) !important;
+            color: white !important;
+            border-color: var(--secondary-color) !important;
+            cursor: default !important;
+            pointer-events: none; /* Prevent further dragging/dropping */
+        }
+
+        .match-correct .fitness-text {
+            color: white;
+        }
+
+        .invisible-role {
+            /* Placeholder for the empty slot after dragging */
+            visibility: hidden;
+            height: 4.5rem; /* Match the role-item height */
+            margin-bottom: 0.75rem; /* Match the role-item margin */
+        }
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 768px) {
+            .game-card {
+                padding: 1.5rem;
+            }
+            .role-item, .fitness-slot {
+                height: auto;
+                min-height: 4rem;
+                justify-content: flex-start;
+                padding: 1rem;
+            }
+            .role-item span, .fitness-slot span {
+                font-size: 1.125rem; /* text-lg */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer" class="game-card max-w-4xl w-full p-6 sm:p-10">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 text-center">
+            運動體適能配對挑戰
+        </h1>
+        <p class="text-gray-600 mb-8 text-center">將左側的運動角色拖曳到右側，與其最重要的體適能要素進行配對。完成所有配對，以測試您的理解！</p>
+
+        <!-- Game Area -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <!-- Roles to Drag (Left Side) -->
+            <div>
+                <h2 class="text-xl font-bold mb-4 text-gray-700">運動角色 (拖曳卡片)</h2>
+                <div id="rolesList" class="space-y-3">
+                    <!-- Roles will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Fitness Slots (Right Side) -->
+            <div>
+                <h2 class="text-xl font-bold mb-4 text-gray-700">核心體適能 (放置區)</h2>
+                <div id="fitnessSlots" class="space-y-3">
+                    <!-- Slots will be dynamically inserted here -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Result/Control Area -->
+        <div class="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+            <div id="resultMessage" class="text-xl font-bold text-gray-700 mb-4 sm:mb-0">
+                <!-- Message area -->
+            </div>
+            <button id="resetButton" class="w-full sm:w-auto px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 transition duration-300">
+                重新開始遊戲
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // 遊戲資料庫：角色與其所需的核心體適能 (id 必須唯一且用於配對)
+        const roleFitnessPairs = [
+            { id: 1, role: "馬拉松跑者", fitness: "心肺耐力 (Cardiorespiratory Endurance)", icon: "🏃" },
+            { id: 2, role: "奧運舉重選手", fitness: "肌力 (Muscular Strength)", icon: "🏋️" },
+            { id: 3, role: "籃球灌籃者", fitness: "爆發力 (Power)", icon: "🏀" },
+            { id: 4, role: "藝術體操運動員", fitness: "柔軟度 (Flexibility)", icon: "🤸" },
+            { id: 5, role: "足球守門員", fitness: "敏捷性 (Agility)", icon: "🧤" },
+            { id: 6, role: "芭蕾舞者", fitness: "平衡感 (Balance)", icon: "🩰" },
+            { id: 7, role: "長距離自行車手", fitness: "肌耐力 (Muscular Endurance)", icon: "🚴" },
+            { id: 8, role: "跆拳道選手", fitness: "反應時間 (Reaction Time)", icon: "🥋" }
+        ];
+
+        const rolesListEl = document.getElementById('rolesList');
+        const fitnessSlotsEl = document.getElementById('fitnessSlots');
+        const resultMessageEl = document.getElementById('resultMessage');
+        const resetButton = document.getElementById('resetButton');
+
+        let matchedCount = 0;
+        let totalMatches = roleFitnessPairs.length;
+        let currentlyDraggingId = null;
+
+        /**
+         * 初始化遊戲，生成角色卡片和體適能槽位
+         */
+        function initializeGame() {
+            rolesListEl.innerHTML = '';
+            fitnessSlotsEl.innerHTML = '';
+            resultMessageEl.textContent = '請開始配對！';
+            resetButton.style.display = 'none';
+            matchedCount = 0;
+
+            // 複製並打亂角色和體適能的順序
+            const shuffledRoles = [...roleFitnessPairs].sort(() => Math.random() - 0.5);
+            const shuffledFitness = [...roleFitnessPairs].sort(() => Math.random() - 0.5);
+
+            // 1. 生成角色卡片 (Draggable Items)
+            shuffledRoles.forEach(pair => {
+                const roleEl = document.createElement('div');
+                roleEl.className = 'role-item p-4 rounded-lg shadow-md flex items-center space-x-3';
+                roleEl.setAttribute('draggable', true);
+                roleEl.setAttribute('data-role-id', pair.id);
+                roleEl.innerHTML = `<span class="text-2xl">${pair.icon}</span> <span class="text-lg">${pair.role}</span>`;
+                roleEl.addEventListener('dragstart', handleDragStart);
+                rolesListEl.appendChild(roleEl);
+            });
+
+            // 2. 生成體適能槽位 (Drop Targets)
+            shuffledFitness.forEach(pair => {
+                const slotEl = document.createElement('div');
+                slotEl.className = 'fitness-slot p-4 rounded-lg flex items-center justify-center h-20';
+                slotEl.setAttribute('data-fitness-id', pair.id);
+                slotEl.innerHTML = `<span class="fitness-text text-xl font-bold text-gray-600">${pair.fitness}</span>`;
+                slotEl.addEventListener('dragover', handleDragOver);
+                slotEl.addEventListener('dragleave', handleDragLeave);
+                slotEl.addEventListener('drop', handleDrop);
+                fitnessSlotsEl.appendChild(slotEl);
+            });
+            
+            // 初始時顯示重置按鈕，但若未開始遊戲則保持隱藏
+            resetButton.style.display = 'none'; 
+        }
+
+        /**
+         * 處理拖曳開始事件
+         * @param {DragEvent} e
+         */
+        function handleDragStart(e) {
+            currentlyDraggingId = e.target.getAttribute('data-role-id');
+            e.dataTransfer.setData('text/plain', currentlyDraggingId);
+            e.target.classList.add('opacity-50'); // 提供拖曳視覺反饋
+        }
+
+        /**
+         * 處理拖曳中在目標上移動
+         * @param {DragEvent} e
+         */
+        function handleDragOver(e) {
+            e.preventDefault(); // 允許放下
+            // 只允許拖曳到未配對的槽位
+            if (!e.currentTarget.classList.contains('match-correct')) {
+                e.currentTarget.classList.add('drag-over');
+            }
+        }
+
+        /**
+         * 處理拖曳離開目標事件
+         * @param {DragEvent} e
+         */
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        /**
+         * 處理放下事件
+         * @param {DragEvent} e
+         */
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+
+            const droppedRoleId = e.dataTransfer.getData('text/plain');
+            const targetFitnessId = e.currentTarget.getAttribute('data-fitness-id');
+
+            // 移除拖曳視覺反饋
+            const draggedRoleEl = document.querySelector(`.role-item[data-role-id="${droppedRoleId}"]`);
+            if (draggedRoleEl) {
+                draggedRoleEl.classList.remove('opacity-50');
+            }
+            
+            // 檢查是否配對成功
+            if (droppedRoleId === targetFitnessId) {
+                handleSuccessfulMatch(draggedRoleEl, e.currentTarget);
+            } else {
+                handleFailedMatch(e.currentTarget);
+            }
+        }
+
+        /**
+         * 處理配對成功
+         * @param {HTMLElement} roleEl - 拖曳的角色元素
+         * @param {HTMLElement} slotEl - 放置的槽位元素
+         */
+        function handleSuccessfulMatch(roleEl, slotEl) {
+            matchedCount++;
+
+            // 1. 轉換槽位為已配對狀態
+            slotEl.classList.add('match-correct');
+            slotEl.innerHTML = roleEl.innerHTML; // 將角色內容移動到槽位
+
+            // 2. 移除槽位的拖曳事件監聽器 (防止再次被拖曳)
+            slotEl.removeEventListener('dragover', handleDragOver);
+            slotEl.removeEventListener('dragleave', handleDragLeave);
+            slotEl.removeEventListener('drop', handleDrop);
+
+            // 3. 創建一個隱藏的佔位符替換原角色卡片，以保持佈局不變
+            const invisiblePlaceholder = document.createElement('div');
+            invisiblePlaceholder.className = 'invisible-role';
+            roleEl.parentNode.replaceChild(invisiblePlaceholder, roleEl);
+            
+            // 確保重置按鈕可見
+            resetButton.style.display = 'block';
+
+            // 4. 檢查是否完成遊戲
+            if (matchedCount === totalMatches) {
+                endGame(true);
+            } else {
+                resultMessageEl.textContent = `✅ 配對成功！已完成 ${matchedCount}/${totalMatches} 組。`;
+            }
+        }
+
+        /**
+         * 處理配對失敗
+         * @param {HTMLElement} slotEl - 放置的槽位元素
+         */
+        function handleFailedMatch(slotEl) {
+            resultMessageEl.textContent = `❌ 配對錯誤，請再試一次！`;
+            // 閃爍一下失敗的視覺效果
+            slotEl.style.backgroundColor = '#fca5a5'; // Red-300
+            setTimeout(() => {
+                slotEl.style.backgroundColor = '';
+                resultMessageEl.textContent = `請繼續配對。`;
+            }, 500);
+            
+            // 確保重置按鈕可見
+            resetButton.style.display = 'block';
+        }
+
+        /**
+         * 遊戲結束
+         * @param {boolean} success - 是否成功完成所有配對
+         */
+        function endGame(success) {
+            if (success) {
+                resultMessageEl.textContent = `🎉 恭喜！您成功配對了所有體適能要素！`;
+                resultMessageEl.classList.add('text-secondary-color', 'animate-pulse');
+            }
+            resetButton.style.display = 'block';
+        }
+
+        // 設置重置按鈕的點擊事件
+        resetButton.addEventListener('click', () => {
+            resultMessageEl.classList.remove('text-secondary-color', 'animate-pulse');
+            initializeGame();
+        });
+
+        // 首次加載時初始化遊戲
+        window.onload = initializeGame;
+
+    </script>
+</body>
+</html>
